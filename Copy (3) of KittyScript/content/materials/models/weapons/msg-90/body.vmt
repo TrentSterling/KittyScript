@@ -1,0 +1,6 @@
+VertexLitGeneric
+{
+	"$basetexture"	"models\weapons\msg-90\body"
+	"$envmap" "env_cubemap"
+	"$envmapmask" "models\weapons\msg-90\body_ref"
+}

@@ -1,0 +1,7 @@
+"eyes"
+{
+	"$basetexture" "models/Humans/Male/rohnw18/eyeball_l"
+	"$iris" "models/Humans/Male/rohnw18/pupil_l"
+	"$halflambert" 1
+	"$nodecal" "1"
+}

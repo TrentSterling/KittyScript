@@ -1,0 +1,535 @@
+-- Job/money bar:
+local PANEL={}
+
+ surface.CreateFont( "coolvetica", 20, 500, true, false, "ServerMessage" ) 
+function PANEL:Init()
+	self.Name = vgui.Create( "Label", self )
+	self.Name:SetText("Name: "..LocalPlayer():GetNetworkedString("rpname"))
+
+	self.Job = vgui.Create( "Label", self )
+	self.Job:SetText("Job: "..LocalPlayer():GetNetworkedString("job"))
+
+	self.Money = vgui.Create( "Label", self )
+	self.Money:SetText("Money: "..tostring(LocalPlayer():GetNetworkedInt("money")))
+	
+	self.Time = vgui.Create( "Label", self )
+	self.Time:SetText(T_HOURS..":"..T_MINUTES)
+end
+
+function PANEL:Paint()
+	surface.SetDrawColor( 255, 255, 255, 128 )
+	surface.DrawRect( 0, 0, self:GetWide(),self:GetTall())
+
+	surface.SetDrawColor( 0, 0, 0, 200 )
+	surface.DrawRect( 2, 2, self:GetWide()-4,self:GetTall()-4)
+end
+
+function PANEL:Think()
+	self.Name:SetText("Name: "..LocalPlayer():GetNetworkedString("rpname"))
+	self.Name:SetPos( 20, 4 )
+	self.Name:SizeToContents()
+
+	self.Job:SetText("Job: "..LocalPlayer():GetNetworkedString("job"))
+	self.Job:SetPos( self.Name:GetWide()+50, 4 )
+	self.Job:SizeToContents()
+
+	self.Money:SetText("Money: "..LocalPlayer():GetNetworkedInt("money"))
+	self.Money:SizeToContents()
+	self.Money:SetPos( self.Name:GetWide()+50+self.Job:GetWide()+50, 4 )
+	
+	self.Time:SetText(T_HOURS..":"..T_MINUTES)
+	self.Time:SizeToContents()
+	self.Time:SetPos( self.Name:GetWide()+50+self.Job:GetWide()+50+self.Money:GetWide()+50, 4 )
+end
+
+function PANEL:ApplySchemeSettings()
+	self.Name:SetFont( "ChatFont" )
+	self.Name:SetFGColor( Color( 255, 255, 255, 255 ) )
+	self.Job:SetFont( "ChatFont" )
+	self.Job:SetFGColor( Color( 255, 255, 255, 255 ) )
+	self.Money:SetFont( "ChatFont" )
+	self.Money:SetFGColor( Color( 255, 255, 255, 255 ) )
+	self.Time:SetFont( "ChatFont" )
+	self.Time:SetFGColor( Color( 255, 255, 255, 255 ) )
+end
+
+vgui.Register( "InfoBar", PANEL, "Panel" )
+
+--Server Messages
+local PANEL={}
+
+function PANEL:Init()
+self.Alpha=1
+end
+
+function PANEL:Paint()
+	if self.Message then
+		draw.WordBox( 2, 0, 0, self.Message, "ServerMessage", Color(76,76,76,50*self.Alpha), Color(255,255,255,255*self.Alpha) )
+	end
+	if self.Start and CurTime()>self.Start then
+	self.Alpha=math.Clamp(self.Alpha-0.05,0,1)
+		if self.Alpha==0 then
+			MESSAGEWINDOW.Messages[self.ID]=nil
+			self:SetVisible(false)
+			self:Remove()
+			self=nil
+		end
+	end
+end
+
+vgui.Register( "ServerMessage", PANEL, "Panel" )
+
+--OOC Messages
+local PANEL={}
+
+function PANEL:Init()
+	self.Alpha=1
+end
+
+function PANEL:Paint()
+	if self.Message then
+		surface.SetFont( "Default" )
+		local w, h = surface.GetTextSize( self.Message )
+		self:SetSize(w+2,h+2)
+		draw.WordBox( 2, 0, 0, self.Message, "Default", Color(76,76,76,50*self.Alpha), Color(255,255,255,255*self.Alpha) )
+	end
+	if self.Start and CurTime()>self.Start then
+	self.Alpha=math.Clamp(self.Alpha-0.05,0,1)
+		if self.Alpha==0 then
+			OOCWINDOW.Messages[self.ID]=nil
+			self:SetVisible(false)
+			self:Remove()
+			self=nil
+		end
+	end
+end
+
+vgui.Register( "OOCMessage", PANEL, "Panel" )
+
+
+-- Server Message window
+local PANEL={}
+
+function PANEL:Init()
+	MESSAGEWINDOW=self
+	self.On=true
+
+	self.Messages={}
+
+	self.Alphap=0
+end
+
+function PANEL:AddMessage(str)
+	local new=vgui.Create( "ServerMessage", self )
+	new.Message=str
+	new.Start=CurTime()+5
+	new:SetPos(0,50)
+	new:SetSize(ScrW()/3-5,20)
+	local id=table.insert(self.Messages, new )
+	new.ID=id
+end
+
+function PANEL:Paint()
+	if self.On then
+		if self.Alphap<1 then
+			self.Alphap=math.Clamp(self.Alphap+0.1,0,1)
+		end
+	else
+		if self.Alphap>0 then
+			self.Alphap=math.Clamp(self.Alphap-0.05,0,1)
+		end
+	end
+	surface.SetDrawColor( 255, 255, 255, 128*self.Alphap )
+	surface.DrawRect( 0, 0, self:GetWide(),self:GetTall())
+
+	surface.SetDrawColor( 0, 0, 0, 200*self.Alphap )
+	surface.DrawRect( 2, 2, self:GetWide()-4,self:GetTall()-4)
+
+	for _,obj in pairs(self.Messages) do
+		if self.On then
+			obj:SetVisible( true )
+		else
+			obj:SetVisible( false )
+		end
+	end
+
+	self.DesiredSize=22
+
+	local y=2
+	for k, v in pairs(self.Messages) do
+		v:SetPos( 2, y )
+		y = y+22
+		self.DesiredSize=y+2
+	end
+
+	if self:GetTall()<self.DesiredSize then
+		self:SetSize(ScrW()/3,math.Clamp(self:GetTall()+5,0,self.DesiredSize))
+	elseif self:GetTall()>self.DesiredSize then
+		self:SetSize(ScrW()/3,math.Clamp(self:GetTall()-5,self.DesiredSize,self:GetTall()+1))
+	end
+
+end
+
+vgui.Register( "ServerMessageWindow", PANEL, "Panel" )
+
+
+-- OOC Message window
+local PANEL={}
+
+function PANEL:Init()
+	OOCWINDOW=self
+	self.On=true
+	self.Str={}
+	self.Alphap=0
+end
+
+function PANEL:AddMessage(str)
+	self.Str[#self.Str+1]=str
+end
+
+function PANEL:Paint()
+	if self.On then
+		if self.Alphap<1 then
+			self.Alphap=math.Clamp(self.Alphap+0.1,0,1)
+		end
+	else
+		if self.Alphap>0 then
+			self.Alphap=math.Clamp(self.Alphap-0.05,0,1)
+		end
+	end
+	surface.SetDrawColor( 255, 255, 255, 128*self.Alphap )
+	surface.DrawRect( 0, 0, self:GetWide(),self:GetTall())
+
+	surface.SetDrawColor( 0, 0, 0, 200*self.Alphap )
+	surface.DrawRect( 2, 2, self:GetWide()-4,self:GetTall()-4)
+	
+	-- first we need a string:
+	local str=""
+	local num=1
+	if #self.Str>7 then
+		num=#self.Str-7
+	end
+	for i=num,#self.Str do
+		str=str..self.Str[i].."\n"
+	end
+	surface.SetFont( "DefaultSmall" )
+	local w, h = surface.GetTextSize(str)
+	if w>ScrW()/3 then
+		self:SetSize(w+5,h+5)
+	else
+		self:SetSize(ScrW()/3,h+5)
+	end
+	if self.Alphap>0 then
+		str="<font=DefaultSmall>"..str.."</font>"
+		local mark=markup.Parse(str)
+		mark:Draw(5,5)
+		--draw.DrawText(str,"DefaultSmall",5,5,Color(255, 255, 255, 255*self.Alphap),TEXT_ALIGN_LEFT)
+	end
+end
+
+vgui.Register( "OOCMessageWindow", PANEL, "Panel" )
+
+-- tab buttons
+
+local PANEL={}
+
+function PANEL:Init()
+	self.Active=false
+end
+
+function PANEL:Paint()
+	local a=0
+	if self.Active then
+		a=1
+	else
+		a=0.5
+	end
+	if self.Armed then
+		surface.SetDrawColor( 128, 255, 128, 128*a )
+	else
+		surface.SetDrawColor( 255, 255, 255, 128*a )
+	end
+	surface.DrawRect( 0, 0, self:GetWide(),self:GetTall())
+
+	surface.SetDrawColor( 0, 0, 0, 200*a )
+	surface.DrawRect( 1, 1, self:GetWide()-2,self:GetTall()-2)
+	
+	draw.DrawText(self:GetValue(),"Default",self:GetWide()/2,7.5,Color(255, 255, 255, 255),TEXT_ALIGN_CENTER)
+	
+	return true
+end
+
+function PANEL:DoClick()
+	if self.ID then
+		for k,v in pairs(F1WINDOW.Buttons) do
+			v.Active=false
+		end
+		self.Active=true
+		for k,v in pairs(F1WINDOW.Children) do
+			v.On=false
+		end
+		F1WINDOW.Children[self.ID].On=true
+	end
+end
+
+vgui.Register( "TabButton", PANEL, "Button" )
+
+-- F1 window
+
+local PANEL={}
+
+function PANEL:Init()
+	F1WINDOW=self
+	self.On=false
+	self.Alphap=0
+	self.Children={}
+	local y=50
+	local x=10
+	local w=1000
+	local h=1000
+	self.Children[1]=vgui.Create( "HelpPanel", self )
+	self.Children[1]:SetPos(x,y)
+	self.Children[1]:SetSize(w,h)
+	self.Children[2]=vgui.Create( "RulesPanel", self )
+	self.Children[2]:SetPos(x,y)
+	self.Children[2]:SetSize(w,h)
+	self.Children[3]=vgui.Create( "OptionsPanel", self )
+	self.Children[3]:SetPos(x,y)
+	self.Children[3]:SetSize(w,h)
+	self.Buttons={}
+	self.Buttons[1]=vgui.Create( "TabButton", self )
+	self.Buttons[1].ID=1
+	self.Buttons[1]:SetPos(5,5)
+	self.Buttons[1]:SetSize(100,30)
+	self.Buttons[1]:SetText("Help")
+	self.Buttons[2]=vgui.Create( "TabButton", self )
+	self.Buttons[2].ID=2
+	self.Buttons[2]:SetPos(105,5)
+	self.Buttons[2]:SetSize(100,30)
+	self.Buttons[2]:SetText("Rules")
+	self.Buttons[3]=vgui.Create( "TabButton", self )
+	self.Buttons[3].ID=3
+	self.Buttons[3]:SetPos(205,5)
+	self.Buttons[3]:SetSize(100,30)
+	self.Buttons[3]:SetText("Options")
+	end
+
+function PANEL:Paint()
+	if self.On then
+		if self.Alphap<1 then
+			self.Alphap=math.Clamp(self.Alphap+0.1,0,1)
+		end
+	else
+		if self.Alphap>0 then
+			self.Alphap=math.Clamp(self.Alphap-0.05,0,1)
+		end
+	end
+	
+	for _,obj in pairs(self.Children) do
+		if self.On then
+			obj:SetVisible( true ) 
+		else
+			obj:SetVisible( false )
+		end
+	end
+	for _,obj in pairs(self.Buttons) do
+		if self.On then
+			obj:SetVisible( true )
+		else
+			obj:SetVisible( false )
+		end
+	end	
+	
+	surface.SetDrawColor( 255, 255, 255, 128*self.Alphap )
+	surface.DrawRect( 0, 0, self:GetWide(),self:GetTall())
+
+	surface.SetDrawColor( 0, 0, 0, 200*self.Alphap )
+	surface.DrawRect( 2, 2, self:GetWide()-4,self:GetTall()-4)
+end
+
+vgui.Register( "F1Window", PANEL, "Panel" )
+
+local PANEL={}
+
+function PANEL:Init()
+	self.Alphap=1
+	self.On=true
+end
+
+function PANEL:Paint()
+
+	if self.On then
+		if self.Alphap<1 then
+			self.Alphap=math.Clamp(self.Alphap+0.1,0,1)
+		end
+	else
+		if self.Alphap>0 then
+			self.Alphap=math.Clamp(self.Alphap-0.05,0,1)
+		end
+	end
+	local text=[[
+If you use TEAM SAY instead of SAY to speak you will WHISPER instead of local talk.
+Local talk has a radius of 1000 units. Whispers have a radius of 100.
+The following commands are available:
+ /job X
+     Sets your job to X
+	 ALIAS: /setjob
+ .// X
+     Displays X in the OUT OF CHARACTER HUD panel.
+     ALIAS: (( , //
+ /me X
+     Displays X as an action (/me eats shows up as *Yourname eats)
+ /give X
+     Gives X (a number) money to the player you are looking at.
+     ALIAS: /givecash , /givemoney
+ /drop X
+     Drops X (a number) money to the ground as a physics object.
+     ALIAS: /dropcash , /dropmoney
+ /radio X
+     Creates a radio with the FREQUENCY of X. This works the same way as a radio in real life.
+     Simply stand near a radio and speak to broadcast your voice through the frequency to all other radios on the same one.
+ /bug X
+     Creates a BUG. This is the SAME as a radio, except it cannot RECIEVE. Great for HIDING in places to SPY on people.
+ /engineon AND /engineoff
+     If you are in a vehicle, these will switch on and off the engine.
+	 If you turn it off, it won't start back up until you execute engineon.
+ /skin X
+     If aiming at property you own, this will set the property's SKIN to the NUMBER you specify.
+	 Doors and some cars have lots of skins which you can use to make them look how you want, have a play around.
+ /share NAME
+     If you are looking at something that belongs to you (door, car, etc), you may share it with this command.
+	 You must specify a FIRST and LAST name seperated with a SPACE. This is the recipent's IN CHARACTER name.
+	 ALIAS: /sharedoor , /shareproperty
+ /dropweapon
+     Drops the weapon you are currently holding. To pick up weapons, walk into them while holding your USE button.
+To toggle this window, press F1.
+It will not close now because you have to set your character's information in the OPTIONS page.
+
+The following CONSOLE COMMANDS are available:
+ listsid
+     Lists RP names and their SteamIDs.
+		   ]]
+	draw.DrawText(text,"DefaultSmall",0,0,Color(255, 255, 255, 255*self.Alphap),TEXT_ALIGN_LEFT)
+end
+vgui.Register( "HelpPanel", PANEL, "Panel" )
+
+local PANEL={}
+
+function PANEL:Init()
+	self.On=false
+	self.Alphap=0
+end
+
+function PANEL:Paint()
+
+	if self.On then
+		if self.Alphap<1 then
+			self.Alphap=math.Clamp(self.Alphap+0.1,0,1)
+		end
+	else
+		if self.Alphap>0 then
+			self.Alphap=math.Clamp(self.Alphap-0.05,0,1)
+		end
+	end
+	
+	local text=[[
+The majority of the rules can be summed up: You cannot, through action or inaction, allow anyone else's roleplay to be disrupted in a manner which cannot be justified in-character.
+    Your character is not you. You are not your character.
+    You can talk out-of-character by prefixing your chat with the commands shown in the help tab.
+    Your character must have an in-character name.
+    
+You may not:
+    Construct unrealistic contraptions or structures.
+    Use exploits to your advantage.
+    Kill another player without reason or without motive.
+    Prop surf.
+    Own properties for the express purpose of selling them.
+    Create vehicles using wheels.
+    Swap weapons with a player to bypass the weapon selling restrictions.
+		   ]]
+	draw.DrawText(text,"DefaultSmall",0,0,Color(255, 255, 255, 255*self.Alphap),TEXT_ALIGN_LEFT)
+end
+vgui.Register( "RulesPanel", PANEL, "Panel" )
+local PANEL={}
+
+function PANEL:Init()
+	self.On=false
+	self.Alphap=0
+	self.Children={}
+	self.Children[1]=vgui.Create( "TextEntry", self )
+	self.Children[1]:SetPos(60,120)
+	self.Children[1]:SetSize(150,20)
+	self.Children[1]:MakePopup()
+
+	self.Children[2]=vgui.Create( "TextEntry", self )
+	self.Children[2]:SetPos(215,120)
+	self.Children[2]:SetSize(150,20)
+	self.Children[2]:MakePopup()
+
+	self.Children[3]=vgui.Create( "TextEntry", self )
+	self.Children[3]:SetPos(60,160)
+	self.Children[3]:SetSize(150,20)
+	self.Children[3]:SetText("None")
+	self.Children[3]:MakePopup()
+
+	self.Children[4]=vgui.Create( "ModelButton", self )
+	self.Children[4]:SetPos(0,100)
+	self.Children[4]:SetModel("models/player/female_04.mdl")
+	self.Children[4].Name="female1"
+
+	self.Children[5]=vgui.Create( "ModelButton", self )
+	self.Children[5]:SetPos(64,100)
+	self.Children[5]:SetModel("models/player/female_06.mdl")
+	self.Children[5].Name="female2"
+
+	self.Children[6]=vgui.Create( "ModelButton", self )
+	self.Children[6]:SetPos(128,100)
+	self.Children[6]:SetModel("models/player/female_07.mdl")
+	self.Children[6].Name="female3"
+
+	self.Children[7]=vgui.Create( "ModelButton", self )
+	self.Children[7]:SetPos(0,164)
+	self.Children[7]:SetModel("models/player/male_02.mdl")
+	self.Children[7].Name="male1"
+
+	self.Children[8]=vgui.Create( "ModelButton", self )
+	self.Children[8]:SetPos(64,164)
+	self.Children[8]:SetModel("models/player/male_03.mdl")
+	self.Children[8].Name="male2"
+
+	self.Children[9]=vgui.Create( "ModelButton", self )
+	self.Children[9]:SetPos(128,164)
+	self.Children[9]:SetModel("models/player/male_08.mdl")
+	self.Children[9].Name="male3"
+
+	self.Children[10]=vgui.Create( "SaveButton", self )
+	self.Children[10]:SetPos(0,230)
+	self.Children[10]:SetSize(100,30)
+	self.Children[10]:SetVisible(true)
+end
+
+function PANEL:Paint()
+	for _,obj in pairs(self.Children) do
+			obj:SetVisible( true )
+			obj:SetKeyBoardInputEnabled(true)
+			obj:SetMouseInputEnabled(true)
+	end
+
+
+	draw.DrawText("First and last name:","Default",5,5,Color(255, 255, 255, 255*self.Alphap),TEXT_ALIGN_LEFT)
+	draw.DrawText("Job:","Default",5,45,Color(255, 255, 255, 255*self.Alphap),TEXT_ALIGN_LEFT)
+end
+vgui.Register( "OptionsPanel", PANEL, "Panel" )
+
+-- model select button 
+
+local PANEL={}
+
+function PANEL:DoClick()
+	LocalPlayer():ConCommand("cl_playermodel "..self.Name)
+end
+
+vgui.Register( "ModelButton", PANEL, "SpawnIcon" )
+
+
+vgui.Register( "SaveButton", PANEL, "Button" )

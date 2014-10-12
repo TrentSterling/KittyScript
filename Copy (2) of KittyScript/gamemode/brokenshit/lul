@@ -1,0 +1,40 @@
+
+function HideSelf(ply, cmd, args)
+	if( tonumber(ply:GetNWInt( "adminlevel" )) < 2 ) then
+		ply:SendMessage("You need admin rights for this!",3,Color(255,0,0,255))
+	return end
+
+	
+	
+	
+	
+		
+	if( tonumber(ply:GetNWInt( "adminhiding" )) == 0 ) then
+		ply:GetActiveWeapon():SetNoDraw( true );
+		ply:SetNoDraw( true );
+		ply:SetNWInt( "adminhiding", 1 )
+		ply:SendMessage("You are cloaked!",3,Color(255,0,0,255))
+		return end
+		
+		
+	
+	
+	
+	
+	
+			
+	if( tonumber(ply:GetNWInt( "adminhiding" )) == 1 ) then
+		ply:GetNWInt( "adminhiding" )
+		ply:GetActiveWeapon():SetNoDraw( false );
+		ply:SetNoDraw( false );
+		ply:SetNWInt( "adminhiding", 0 )
+		ply:SendMessage("You are NOT cloaked!",3,Color(255,0,0,255))
+		return end
+	
+	
+	
+	
+	
+	
+end
+concommand.Add("rp_hide", HideSelf)

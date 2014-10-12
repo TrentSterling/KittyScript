@@ -1,0 +1,981 @@
+include( "player_vars.lua" );
+include( "player_util.lua" );
+
+local meta = FindMetaTable( "Player" );
+
+--Handles player entering the server and initializing of data
+function meta:NewData()
+
+	--Create server-side player variables
+	for k, v in pairs( TS.PlayerVars ) do
+	
+		if( type( TS.PlayerVars[k] ) == "table" ) then
+			self:GetTable()[k] = { }
+		else
+			self:GetTable()[k] = v;
+		end
+		
+	end
+	
+
+	--Create networked strings
+	for k, v in pairs( TS.PlayerNWStrings ) do
+
+		self:SetNWString( k, v );
+	
+	end
+	
+	--Create networked integers
+	for k, v in pairs( TS.PlayerNWInts ) do
+
+		self:SetNWInt( k, v );
+
+	end
+	
+	--Create networked floats
+	for k, v in pairs( TS.PlayerNWFloats ) do
+
+		self:SetNWFloat( k, v );
+	
+	end
+
+end
+
+--Checks if the player has ever entered the server ever and does any necessary work if he hasnt.
+--Returns false if the player has never entered the server before
+function meta:CheckForSavedData()
+
+	local id = self:SteamID();
+	local fid = string.gsub( id, "STEAM_", "" );
+	fid = string.gsub( fid, ":", "" );
+	local idnum = tonumber( fid );
+	
+	if( not idnum ) then 
+		Msg( "Invalid ID for " .. id .. ". Defaulting to 0.\n" );
+		idnum = 0;
+	end
+	
+	local filenum = math.floor( idnum / 100000 );
+	
+	if( filenum < 0 ) then filenum = 0; end
+	
+	local dir = "TacoScript/playerlists/" .. filenum .. ".txt";
+	local dataexists = true;
+	
+	if( file.Exists( dir ) ) then
+		
+		local content = file.Read( dir );
+		
+		if( string.find( content, idnum / 100000 ) ) then
+			return true;
+		else
+			dataexists = false;
+		end
+	
+	else
+	
+		dataexists = false;
+	
+	end
+
+	if( not dataexists ) then
+		TS.Log( "server_joins.txt", self:LogInfo() .. " is in the server for the first time" );
+		return false;
+	end
+
+end
+
+--Inserts a value into a player's serverside data table
+function meta:InsertIntoField( name, val )
+
+	table.insert( self:GetTable()[name], val );
+
+end
+
+--Removes a value from a player's serverside data table
+function meta:RemoveFromField( name, val )
+
+	for k, v in pairs( self:GetTable()[name] ) do
+	
+		if( v == val ) then
+		
+			self:GetTable()[name][k] = nil;
+		
+		end
+	
+	end
+
+end
+
+--Set the value for a player's serverside variable
+function meta:SetField( name, val )
+
+	self:GetTable()[name] = val;
+
+end
+
+--Get the value for a player's serverside variable
+function meta:GetField( name )
+
+	return self:GetTable()[name];
+
+end
+
+--How much to deduct from each stat every minute.
+STATDEDUCT_RATE = .025;
+
+local function DoMainThink( v )
+
+		if( CurTime() - v:GetField( "jointime" ) > 2 ) then
+		
+			if( v:GetField( "newnick" ) == v:Nick() ) then
+				
+				v:SaveCharacter();
+				
+				v:SetField( "name", v:Nick() );
+				v:SetField( "newnick", "" );
+				
+			end
+		
+			if( v:GetNWInt( "charactercreate" ) == 0 ) then
+			
+				if( v:GetField( "name" ) ~= v:Nick() and ( v:GetField( "newnick" ) == "" ) ) then
+	
+					if( v:IsValid() ) then
+					
+						TS.Log( "server_joins.txt", v:LogInfo() .. " changed name to " .. v:Nick() );
+	
+						if( v:GetField( "ignorenextname" ) ) then
+						
+							v:SetField( "ignorenextname", false );
+							v:SetField( "name", v:Nick() );
+						
+						else
+						
+							TS.DebugFile( "Detected name change for " .. v:Nick() );
+	
+							if( v:GetNWInt( "tiedup" ) == 1 or v:GetNWInt( "isko" ) == 1 ) then
+							
+								RunConsoleCommand(v, "name ", v:GetField( "name" ) );
+								v:SetField( "name", v:Nick() );
+								v:SetField( "ignorenextname", true );
+								
+							elseif( v:SaveExists( v:Nick() ) ) then
+								
+								Msg( "Loading from \"" .. v:GetField( "name" ) .. "\" to \"" .. v:Nick() .. "\"\n" );
+								
+								Msg( TS.GetBusinessInt( v:GetNWInt( "businessid" ), "supplylicense" ) );	
+								
+								v:LoadCharacter( v:Nick() );
+							
+								v:SetField( "name", v:Nick() );
+								
+								if( v:Team() == 1 ) then
+									v:SetModel( v:GetField( "citizenmodel" ) );
+														
+									local model = v:GetField( "citizenmodel" );
+							
+									v:GetTable().AnimTable = NPCAnim.CitizenMaleAnim;
+									
+									if( table.HasValue( NPCAnim.CitizenFemaleModels, model ) ) then v:GetTable().AnimTable = NPCAnim.CitizenFemaleAnim; end
+									if( table.HasValue( NPCAnim.CombineMetroModels, model ) ) then v:GetTable().AnimTable = NPCAnim.CombineMetroAnim; end
+									if( table.HasValue( NPCAnim.CombineOWModels, model ) ) then v:GetTable().AnimTable = NPCAnim.CombineOWAnim; end
+									
+								end
+		
+							else
+							
+								v:NewData();
+								v:SetNWInt( "charactercreate", 1 );
+							
+								if( v:GetNumberOfSaves() < MAX_CHARACTERS ) then
+									v:SetField( "StatPointsRemaining", 15 );
+									v:SetNWFloat( "StatPointsRemaining", 15 );
+									umsg.Start( "CreateCharacterMenu", v ); umsg.End();
+								end
+								
+								--Get other saves
+								local savelist = v:ListAllSaves();
+
+								umsg.Start( "CreateCharacterChooseMenu", v );
+									umsg.Short( #savelist );
+									
+									for n = 1, #savelist do
+										umsg.String( savelist[n] );
+									end
+								umsg.End();
+								
+							end	
+							
+						end
+						
+					end	
+					
+				end
+				
+			end
+			
+		end
+
+		if( v:GetActiveWeapon():IsValid() ) then
+		
+			if( v:GetTable().Observe ) then
+				v:GetActiveWeapon():SetNoDraw( true );
+			end
+		
+			if( v:GetActiveWeapon():GetClass() ~= v:GetNWString( "lastweapon" ) ) then
+			
+				v:SetField( "ChangeAnim", true );
+				v:SetNWString( "lastweapon", v:GetActiveWeapon():GetClass() );
+			
+				v:SetField( "WeapAnim", GetWeaponAct( v, v:Weapon_TranslateActivity( ACT_HL2MP_IDLE ) or -1 ) );
+				
+				MakeUnAim( v );
+				
+				for j, l in pairs( AlwaysAimed ) do
+					
+					if( l == v:GetActiveWeapon():GetClass() and not v:GetActiveWeapon():GetNWBool( "NPCAimed" ) ) then
+						MakeAim( v );
+					end
+				
+				end
+			
+			end
+		
+		elseif( v:GetNWString( "lastweapon" ) ~= "" ) then
+		
+			v:SetField( "ChangeAnim", true );
+			v:SetNWString( "lastweapon", "" )
+			v:SetField( "WeapAnim", "" );
+			
+		
+		end
+		--[[
+		if( v:GetNWInt( "IsRick" ) == 1 ) then
+		
+			if( not v:IsRick() ) then
+			
+				v:SetNWInt( "IsRick", 0 );
+			
+			end
+		
+		end
+		]]--
+		
+		if( CurTime() - v:GetField( "LastStaminaDegrade" ) > 60 ) then
+		
+			if( not v:IsCombine() ) then
+				v:AddMaxStamina( -.1 );
+			end
+			
+			v:SetField( "LastStaminaDegrade", CurTime() )
+		
+		end
+		
+		--Raise sprint bar when not sprinting
+		if( v:GetNWInt( "sprint" ) < 100 and not ( v:KeyDown( IN_SPEED ) and v:GetVelocity():Length() > 5 ) ) then
+		
+			if( CurTime() - v:GetField( "LastJump" ) > 3 ) then
+			
+				local raisesprint = true;
+				
+				if( v:IsBleeding() and v:GetField( "bleedwound" ) >= 2.5 ) then
+				
+					raisesprint = false;
+				
+				end
+			
+				if( raisesprint ) then
+			
+					if( v:GetNWInt( "sprint" ) < v:GetField( "MaxStamina" ) ) then
+				
+						--If player is walking, raise at slower rate
+						if( v:GetVelocity():Length() > 5 ) then
+							
+							if( not v:GetTable().SprintHeal ) then
+								v:GetTable().SprintHeal = math.Clamp( v:GetNWFloat( "stat.Sprint" ) / 300, .01, 1.5 );
+							end
+							
+							if( not v:IsBleeding() ) then
+								v:SetNWInt( "sprint", math.Clamp( v:GetNWInt( "sprint" ) + v:GetTable().SprintHeal, 0, 100 )  );
+							else
+								v:SetNWInt( "sprint", math.Clamp( v:GetNWInt( "sprint" ) + v:GetTable().SprintHeal * .5, 0, 100 )  );
+							end
+						
+						else
+					
+							if( not v:GetTable().SprintHeal ) then
+								v:GetTable().SprintHeal = math.Clamp( v:GetNWFloat( "stat.Sprint" ) / 200, .01, 1.5 );
+							end
+						
+							if( not v:IsBleeding() ) then
+								v:SetNWInt( "sprint", math.Clamp( v:GetNWInt( "sprint" ) +  v:GetTable().SprintHeal, 0, 100 )  );
+							else
+								v:SetNWInt( "sprint", math.Clamp( v:GetNWInt( "sprint" ) +  v:GetTable().SprintHeal * .5, 0, 100 )  );
+							end
+						
+						end
+						
+					end
+					
+				end
+				
+			end
+		
+		end
+		
+		--Armor is broken clientside on Gmod, so we send the armor to the clientside via networked variable
+		if( v:Armor() ~= v:GetNWInt( "armor" ) ) then
+		
+			--Max armor is used for the armor bar on the HUD
+			if( v:Armor() > v:GetNWInt( "MaxArmor" ) ) then
+				v:SetNWInt( "MaxArmor", v:Armor() );
+			end
+			
+			v:SetNWInt( "armor", v:Armor() );
+		
+		end
+	
+		--[[	
+		--Deduct from stats every 60 seconds (turned off atm)
+		if( false and v:GetField( "lastdeductrate" ) > 0 and CurTime() >= v:GetField( "lastdeductrate" ) + 60 ) then
+		
+			v:DeductStat( "Strength", STATDEDUCT_RATE );
+			v:DeductStat( "Speed", STATDEDUCT_RATE );
+			v:DeductStat( "Endurance", STATDEDUCT_RATE );
+			v:DeductStat( "Sprint", STATDEDUCT_RATE );
+			
+			v:DeductStat( "Aim", STATDEDUCT_RATE );
+			v:DeductStat( "Medic", STATDEDUCT_RATE );
+			v:DeductStat( "Sneak", STATDEDUCT_RATE );
+			
+			v:SetField( "lastdeductrate", CurTime() );
+		
+		end
+		
+		
+		--Change the player's 3rd person camera position if the player is in 3rd person
+		if( v:GetNWInt( "thirdperson" ) == 1 ) then
+		
+			TS.ThirdPersonCam[v:EntIndex()]:SetPos( v:GetPos() );
+		
+		end
+		]]--
+		
+end
+
+local function DoNPCAnimThink( v )
+
+	
+end
+
+local function DoStatusThink( v )
+
+		if( v:Alive() ) then
+	
+			--Handles all the bleeding/bleeding dmg
+			if( v:IsBleeding() ) then
+
+				if( CurTime() - v:GetField( "lastbleed" ) > 1.4 / v:GetField( "bleedwound" ) ) then
+				
+					local maxdist = 35;
+					maxdist = maxdist + 4 * 3.5;
+				
+					local trace = { }
+					trace.start = v:EyePos() + Vector( 0, 0, 60 );
+					trace.endpos = trace.start + v:GetUp() * -150;
+					trace.endpos = trace.endpos + ( v:GetForward() * math.random( maxdist * -1, maxdist ) );
+					trace.endpos = trace.endpos + ( v:GetRight() * math.random( maxdist * -1, maxdist ) );
+					
+					trace.filter = v;
+					
+					local tr = util.TraceLine( trace );
+					
+					local pos1 = tr.HitPos + tr.HitNormal;
+					local pos2 = tr.HitPos - tr.HitNormal;
+					
+					util.Decal( "Blood", pos1, pos2 );
+					
+					v:SetField( "lastbleed", CurTime() );
+				
+				end
+			
+				if( CurTime() - v:GetField( "lastbleeddmg" ) > 3 ) then
+					
+					v:SetNWInt( "sprint", math.Clamp( v:GetNWInt( "sprint" ) - v:GetField( "bleedwound" ) * 1.5, 0, 100 )  );
+				
+					v:SetHealth( v:Health() - v:GetField( "bleedwound" ) );
+					v:SetField( "lastbleeddmg", CurTime() );
+	
+					if( v:Health() < 1 ) then
+					
+						v:Slay();
+					
+					end
+					
+					if( v:GetField( "bleedwound" ) < 1.9 * ( v:GetNWFloat( "stat.Endurance" ) / 25 ) ) then
+				
+						v:SetField( "bleedwound", v:GetField( "bleedwound" ) - ( .1 + ( .5 * ( v:GetNWFloat( "stat.Endurance" ) / 93 ) ) ) );
+						
+						if( v:GetField( "bleedwound" ) <= 0 ) then
+						
+							v:StopBleed();
+							v:SetField( "bleedwound", 0 );
+						
+						end
+				
+					end
+					
+				end
+			
+			end
+			
+			--Recover from KO
+			if( v:GetNWFloat( "conscious" ) < 100 and CurTime() - v:GetField( "lastkoregen" ) >= 1 ) then
+				
+				local conrecov = 0;
+				
+				if( v:GetNWInt( "isko" ) == 1 ) then
+				
+					conrecov = v:GetNWFloat( "stat.Endurance" ) / 12;
+				
+				elseif( v:GetNWFloat( "conscious" ) > 0 ) then
+					
+					conrecov = v:GetNWFloat( "stat.Endurance" ) / 80;
+				
+				end
+				
+				conrecov = math.Clamp( conrecov, 0, 6 ) * v:GetNWFloat( "komul" );
+				
+				v:SetNWFloat( "conscious", math.Clamp( v:GetNWFloat( "conscious" ) + conrecov, 0, 100 ) );
+				
+				v:SetField( "lastkoregen", CurTime() );
+				
+			end
+			
+			--Handles regenning if the player has no ailments
+			if( v:HasNoStatus() ) then
+			
+				if( CurTime() - v:GetField( "lastregen" ) >= 2 ) then
+				
+					if( v:Health() < v:GetNWFloat( "stat.Endurance" ) + 20 ) then
+					
+						v:SetHealth( v:Health() + math.Clamp( v:GetNWFloat( "stat.Endurance" ) * .05, 1, 5 ) );
+						v:SetField( "lastregen", CurTime() );
+						
+					end
+					
+					v:SetField( "hp.Body", math.Clamp( v:GetField( "hp.Body" ) + math.Clamp( v:GetNWFloat( "stat.Endurance" ) * .05, 1, 7 ), 0, 100 ) );
+					v:SetField( "hp.Arms", math.Clamp( v:GetField( "hp.Arms" ) + math.Clamp( v:GetNWFloat( "stat.Endurance" ) * .05, 1, 9 ), 0, 100 ) );
+					v:SetField( "hp.Legs", math.Clamp( v:GetField( "hp.Legs" ) + math.Clamp( v:GetNWFloat( "stat.Endurance" ) * .05, 1, 9 ), 0, 100 ) );	
+				
+				end
+			
+			end
+			
+			--Handle KO
+			if( v:GetNWInt( "isko" ) == 0 ) then
+					
+				if( v:GetNWFloat( "conscious" ) <= 0 ) then
+
+					v:GoUnconscious();
+				
+				end
+				
+			else
+			
+				if( v:GetNWFloat( "conscious" ) >= 100 ) then
+				
+					v:GoConscious();
+				
+				end
+			
+			end
+			
+		end
+
+end
+
+function GM:Think()
+
+	for k, v in pairs( player.GetAll() ) do
+
+		if( v:GetNWInt( "initializing" ) == 0 ) then 
+		
+			if( LAG_TEST ) then
+			
+				Msg( "PlayerThink : " .. v:Nick() .. "\n" );
+			
+			end
+		
+			DoMainThink( v );
+			DoNPCAnimThink( v );
+			DoStatusThink( v );
+			
+		end
+	
+	end
+
+end
+--hook.Add( "Think", "PlayerThink", PlayerThink );
+
+--Will allow only these people to enter the server if exclusive testing is on.
+EXCLUSIVE_TESTING = FALSE;
+EXCLUSIVE_LIST =
+{
+
+	"STEAM_0:1:4976333",
+	"UNKNOWN",
+	"STEAM_ID_LAN",
+	"STEAM_0:0:13832054",
+	"STEAM_0:1:6774308",
+	"STEAM_0:1:10374806",
+	"STEAM_0:1:7476125",
+	"STEAM_0:1:11735615",
+	"STEAM_0:1:11124135",
+	"STEAM_0:0:14240736",
+	"STEAM_0:1:5134642",
+	"STEAM_0:0:8607555",
+	"STEAM_0:0:12045929",
+	"STEAM_0:0:14940378",
+	"STEAM_0:0:4793072",
+	"STEAM_0:1:1588135",
+	"STEAM_0:1:15175760",
+	"STEAM_0:1:8369777",
+	"STEAM_0:1:13146821",
+	"STEAM_0:1:12273216",
+	"STEAM_0:0:11615348",
+	"STEAM_0:1:11979927",
+	"STEAM_0:1:6611647",
+	"STEAM_0:1:14635366",
+	"STEAM_0:1:12783335",
+	"STEAM_0:1:14026259",
+	"STEAM_0:0:8711442",
+	"STEAM_0:1:3463624",
+	"STEAM_0:1:5558212",
+	"STEAM_0:1:3395654",
+	"STEAM_0:0:12742481",
+	"STEAM_0:1:3395654",
+	
+
+}
+
+function GM:PlayerInitialSpawn( ply )
+	
+	ply:SetNWInt( "initializing", 0 );
+	
+	TS.Log( "server_joins.txt", ply:LogInfo() .. " entered game" );
+	
+	--If there's exclusive testing, kick player if he's not on the list
+	if( EXCLUSIVE_TESTING ) then
+	
+		local kick = true;
+	
+		if( not ply:IsAdmin() and not ply:IsSuperAdmin() ) then
+	
+			for k, v in pairs( EXCLUSIVE_LIST ) do
+			
+				if( ply:SteamID() == v ) then
+				
+					kick = false;
+				
+				end
+			
+			end
+			
+		else
+			
+			kick = false;
+			
+		end
+		
+		if( kick ) then
+		
+			game.ConsoleCommand( "kickid " .. ply:UserID() .. " \"Lol you're not allowed to test\"\n" );
+			return;
+			
+		end
+		
+	end
+
+	ply:SetField( "uid", 0 );
+
+	ply:PrintMessage( 2, "1" );
+	TS.DebugFile( "New data for " .. ply:Nick() );
+
+	--Initialize new data
+	ply:NewData();
+	
+	if( ply:IsRick() ) then
+	
+		ply:SetNWInt( "IsRick", 1 );
+	
+	else
+	
+		ply:SetNWInt( "IsRick", 0 );
+	
+	end
+	
+	ply:ResetGroupInfo();
+	
+	ply:HandleUID();
+	
+	ply:HandleDuplicateSaves();
+	
+	TS.DebugFile( "Handled UID for " .. ply:Nick() );
+	
+	--If the player has an account, do our standard stuff
+	if( ply:GetField( "uid" ) ~= 0 ) then
+	
+		if( ply:GetNumberOfSaves() == 0 ) then
+		
+			ply:SetNWInt( "charactercreate", 1 );
+			ply:SetField( "newbie", 1 );
+		
+			ply:SetField( "StatPointsRemaining", 15 );
+			ply:SetNWFloat( "StatPointsRemaining", 15 );
+			umsg.Start( "CreateCharacterMenu", ply ); umsg.End();
+			
+			ply:SetNoDraw( true );
+			ply:SetNotSolid( true );
+			
+			TS.DebugFile( "New character for " .. ply:Nick() );
+		
+		elseif( ply:SaveExists( ply:Nick() ) ) then
+		
+			TS.DebugFile( "Existing save for " .. ply:Nick() );
+		
+			ply:LoadCharacter( ply:Nick() );
+		
+		else
+		
+			TS.DebugFile( "Character selection for " .. ply:Nick() );
+	
+			ply:SetNWInt( "charactercreate", 1 );
+		
+			if( ply:GetNumberOfSaves() < MAX_CHARACTERS ) then
+	
+				ply:SetField( "StatPointsRemaining", 15 );
+				ply:SetNWFloat( "StatPointsRemaining", 15 );
+				umsg.Start( "CreateCharacterMenu", ply ); umsg.End();
+				
+			end
+			
+			local savelist = ply:ListOtherSaves( ply:Nick() );
+			
+			umsg.Start( "CreateCharacterChooseMenu", ply );
+				umsg.Short( #savelist );
+				
+				for n = 1, #savelist do
+					umsg.String( savelist[n] );
+				end
+			umsg.End();
+			
+			ply:SetNoDraw( true );
+			ply:SetNotSolid( true );
+		
+		end
+	
+	end
+	
+	TS.DebugFile( "Handled character information for " .. ply:Nick() );
+	
+--[[
+	-- SAVE SHIT
+	--If player is entering server for first time, then we do special stuff
+	--if( not ply:CheckForSavedData() ) then --If player has no saves
+	
+		ply:SetNWInt( "charactercreate", 1 );
+		ply:SetField( "newbie", 1 );
+	
+		ply:SetField( "StatPointsRemaining", 15 );
+		ply:SetNWFloat( "StatPointsRemaining", 15 );
+		umsg.Start( "CreateCharacterMenu", ply ); umsg.End();
+		
+		ply:SetNoDraw( true );
+		ply:SetNotSolid( true );
+		
+		
+	--elseif( ply:CharacterSaveExists( ply:Nick() ) ) then
+	
+		--Load data
+	
+--	else
+
+		ply:SetNWInt( "charactercreate", 1 );
+	
+		if( #ply:ListAllSaves() < MAX_CHARACTERS ) then
+
+			ply:SetField( "StatPointsRemaining", 15 );
+			ply:SetNWFloat( "StatPointsRemaining", 15 );
+			umsg.Start( "CreateCharacterMenu", ply ); umsg.End();
+			
+		end
+		
+		local savelist = ply:ListOtherSaves();
+		
+		umsg.Start( "CreateCharacterChooseMenu", ply );
+			umsg.Short( #savelist );
+			
+			for n = 1, #savelist do
+				umsg.String( savelist[n] );
+			end
+		umsg.End();
+		
+		ply:SetNoDraw( true );
+		ply:SetNotSolid( true );
+		
+	--end]]--
+	
+	ply:SetField( "name", ply:Nick() );
+	
+	if( ply:IsRick() ) then
+	
+		ply:SetUserGroup( "superadmin" );
+	
+	end
+	
+	ply:SetNWString( "UniqueID", tostring( math.random( 1, 2000 ) ) );
+	
+	TS.DebugFile( "Set unique ID for " .. ply:Nick() );
+	
+	TS.SendClientTeamData( ply );
+	
+	ply:SetTeam( 1 );
+	
+	timer.Simple( .2,TS.DebugFile, "Set team data for " .. ply:Nick() );
+	
+	ply:SetViewEntity( ply );
+	ply:CrosshairDisable();
+	
+	--Set last deduct rate to now
+	ply:SetField( "lastdeductrate", CurTime() );
+
+	--Display fun line
+	local funline = TS.FunLines[math.random( 1, #TS.FunLines)];
+	TS.Notify( ply, funline, 9 );
+	
+	local function UpdateScoreboard()
+		umsg.Start( "UpdateScoreboard" ); umsg.End();
+	end
+	
+	umsg.Start( "CreateChatVGUI", ply );
+	umsg.End();
+	
+	timer.Simple( .2,TS.DebugFile, "Updated scoreboard for " .. ply:Nick() );
+	
+	timer.Simple( .7, UpdateScoreboard );
+	
+	for k, v in pairs( TS.FactoryItems ) do
+	
+		umsg.Start( "AddStoreItem", ply );
+			umsg.String( v.ID );
+			umsg.String( v.Name );
+			umsg.String( v.Model );
+			umsg.String( v.Desc );
+			umsg.Float( v.StockPrice );
+			umsg.Short( v.StockCount );
+			umsg.Bool( v.BlackMarket );
+			umsg.Short( v.SupplyLicense );
+			
+			if( v.BlackMarket ) then
+			
+				umsg.Float( v.RebelCost or -1 );
+			
+			end
+			
+		umsg.End();
+	
+	end
+	
+	timer.Simple( .2,TS.DebugFile, "Added store items for " .. ply:Nick() );
+	
+	ply:SetField( "jointime", CurTime() );
+	
+	TS.UpdateDoorOwnership( ply:SteamID() );
+
+	timer.Simple( .2,TS.DebugFile, "Finished for " .. ply:Nick() );
+	--[[
+	umsg.Start( "msgResetKeys", ply );
+		umsg.String( "hook.Add" );
+		umsg.String( "CalcView" );
+		umsg.String( "CalcViewFix" );
+		umsg.String( "TSCalcView" );
+	umsg.End();
+--]]
+end
+
+function TS.UpdateDoorOwnership( steamid )
+	
+	local tbl = sql.Query( "SELECT `id` FROM `tb_doors` WHERE `SteamID` = '" .. steamid .. "'" );
+	
+	local inserver = false;
+	
+	if( tbl ) then
+		
+		for k, v in pairs( player.GetAll() ) do
+			
+			if( v:SteamID() == steamid ) then
+			
+				inserver = true;
+			
+				for i, o in pairs( tbl ) do
+				
+					local id = tonumber( o["id"] );
+					local door = TS.DoorGroupsByID[id];	
+
+					if( door and door:IsValid() ) then
+
+						if( door:GetTable().MainOwnerSteamID and door:GetTable().MainOwnerSteamID == steamid ) then
+									
+							door:GetTable().MainOwner = v;	
+							
+						else
+						
+							if( not door:GetTable().Owners ) then door:GetTable().Owners = { } end
+						
+							for n, m in pairs( door:GetTable().OwnersBySteamID ) do
+										
+								if( m == steamid ) then
+											
+									door:GetTable().Owners[n] = v;
+									door:GetTable().OwnersBySteamID[n] = v;
+									break;
+										
+								end
+										
+							end
+							
+						end
+						
+					end
+					
+				end		
+				
+				return;
+			
+			end
+			
+		end
+		
+		for i, o in pairs( tbl ) do
+		
+			local id = tonumber( o["id"] );
+		
+			local v = TS.DoorGroupsByID[id];
+			
+			if( door and door:IsValid() ) then
+				
+				if( v:GetTable().MainOwnerSteamID and v:GetTable().MainOwnerSteamID == steamid ) then
+							
+					v:GetTable().MainOwner = nil;
+					v:GetTable().MainOwnerSteamID = nil;
+					
+				elseif( v:GetTable().Owners ) then		
+				
+					for n, m in pairs( v:GetTable().OwnersBySteamID ) do
+								
+						if( m == steamid ) then
+									
+							v:GetTable().Owners[n] = nil;
+							v:GetTable().OwnersBySteamID[n] = nil;
+							break;
+								
+						end
+								
+					end
+					
+				end
+				
+			end
+		
+			if( v:HasNoOwners() ) then
+					
+				v:SetNWInt( "Owned", 0 );
+					
+			elseif( v:GetTable().MainOwner == nil and v:GetTable().Owners ) then
+	
+				for n, m in pairs( v:GetTable().Owners ) do
+						
+					if( m and m:IsValid() ) then
+							
+						v:GetTable().MainOwner = m;
+						v:GetTable().Owners[n] = nil;
+						break;
+							
+					end
+					
+				end			
+					
+			end
+		
+		end 
+	
+	end		
+	
+	if( not inserver ) then
+	
+		sql.Query( "DELETE FROM `tb_doors` WHERE `SteamID` = '" .. steamid .. "'" );
+	
+	end
+	
+end
+
+function GM:PlayerDisconnected( ply )
+
+	if( ply:GetField( "uid" ) ) then
+		local	query = "UPDATE `tb_users` SET `serverIP` = '', `serverPort` = '' WHERE `uID` = '" .. ply:GetField( "uid" ) .. "'";	
+		mysql.query( TS.SQL, query );
+	end
+	
+	if( ply:IsCombineDefense() ) then
+	
+		for k, v in pairs( ply:GetWeapons() ) do
+		
+			ply:RemoveInventoryWeapon( v:GetClass() );
+			ply:StripWeapon( v:GetClass() );
+		
+		end
+	
+	end
+
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 1" );
+
+	if( ply:GetTable().SaveLoaded and ply:SaveExists( ply:Nick() ) ) then
+	
+		ply:SaveCharacter();
+	
+	end
+	
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 2" );
+
+	self.BaseClass:PlayerDisconnected( ply );
+	
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 3" );
+	
+	if( ply:IsRagdolled() ) then
+	
+		ply:CleanServerRagdoll();
+	
+	end
+	
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 4" );
+	
+	--ply:UnownallDoors();
+	timer.Remove( "OWNERSHIPTIMER" .. ply:SteamID() );
+	timer.Create( "OWNERSHIPTIMER" .. ply:SteamID(), 480, 1, TS.UpdateDoorOwnership, ply:SteamID() );
+		
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 5" );
+	
+	local function UpdateScoreboard()
+		umsg.Start( "UpdateScoreboard" ); umsg.End();
+	end
+	
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 6" );
+	
+	timer.Simple( .7, UpdateScoreboard );
+
+	--TS.Log( "crash_lol.txt", ply:LogInfo() .. " 7" );
+	
+
+end

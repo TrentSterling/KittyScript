@@ -1,0 +1,6 @@
+	if( tonumber(ply:GetNWInt( "adminlevel" )) < 2 ) then
+		ply:SendMessage("You need admin rights for this!",3,Color(255,0,0,255))
+	return end
+
+			target:RemoveFromInventory( nameofCIDcard );
+target:GiveItem( "nameofCIDcard", false );

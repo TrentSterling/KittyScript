@@ -1,0 +1,13 @@
+"VertexLitGeneric"
+{
+	"$baseTexture" 	"Models/Combine_Blackop/Combine_elite"
+	"$envmap" "env_cubemap"	
+	"$bumpmap" "models/combine_Blackop/combine_elite_normal"
+	"$normalmapalphaenvmapmask" 1
+	"$envmapcontrast" 1
+	"$model" 1
+	"$selfillum" 1
+}
+
+
+

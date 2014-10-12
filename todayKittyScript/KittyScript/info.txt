@@ -1,0 +1,14 @@
+     "Gamemode"
+      {
+      "name" "KittyScript"
+      "version" "0.4"
+      "up_date" "02/01/2008"
+      
+      "author_name" "John '[MT]OMalley Dorian"
+      "author_email" "omalley@modtacular.com"
+      "author_url" "http://www.modtacular.com/"
+     
+     "info" "A new RP script that isn't a TacoScript or DarkRP remake."
+     "icon" "" 
+     "hide" "0"
+     } 

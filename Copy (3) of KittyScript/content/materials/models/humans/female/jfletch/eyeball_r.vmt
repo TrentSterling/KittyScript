@@ -1,0 +1,7 @@
+"eyes"
+{
+	"$basetexture" "models/humans/female/jfletch/eyeball_r"
+	"$iris" "models/humans/female/jfletch/pupil_r"
+	"$halflambert" 1
+	"$nodecal" "1"
+}

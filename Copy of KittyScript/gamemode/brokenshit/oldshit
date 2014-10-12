@@ -1,0 +1,162 @@
+	local player = LocalPlayer()
+	local pos = player:GetShootPos()
+	local ang = gui.ScreenToVector( gui.MousePos() )
+	local tracedata = {}
+	tracedata.start = pos
+	tracedata.endpos = pos+(ang*1000)
+	tracedata.filter = player
+	local trace = util.TraceLine(tracedata)
+		local trace = util.GetPlayerTrace( ply, ply:GetCursorAimVector( ) )
+		local tr = util.TraceLine( trace )
+		local item = tr.Entity
+			if trace.HitNonWorld then
+		target = trace.Entity --Store the entity it hit
+	end
+	if (target) then
+		local class = item:GetClass();
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+			--PLAYER:PrintMessage( 2, "ITEM USED: " .. item:GetTable().Data.UniqueID);
+			
+			
+			if( string.sub(class, 1, 5) == "item_" ) then 
+
+ItemData[item:GetTable().Data.UniqueID].Owner = ply
+			ItemData[item:GetTable().Data.UniqueID].OnPickup( ItemData[item:GetTable().Data.UniqueID], ply )
+				
+SaveInfo(ply);
+			tr.Entity:Remove();
+
+					end
+			
+			
+			
+			
+		
+			--self:GetTable().Inventory[id].Table.OnPickup( self:GetTable().Inventory[id].Table );
+--		GiveItem( item:GetTable().Data.UniqueID, tr, ply)
+		
+--local data = item:GetTable().Data
+	--if( not ItemData[tr.Entity] ) then return; end
+	
+
+	--if( ItemData[ration].CanPickup ) then
+		--canpickup = ItemData[ration].CanPickup( ItemData[ration], self );
+	--end
+	
+	
+	
+	--	canpickup = TS.ItemData[id].CanPickup( TS.ItemData[id], self );
+	
+	--if( ply:GetTable().Inventory[args[1]].Table.OnUse ) then
+	--	ply:GetTable().Inventory[args[1]].Table.OnUse( ply:GetTable().Inventory[args[1]].Table );
+	--end
+		--	ply:PrintMessage( 2, "LOL");
+
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+	local player = LocalPlayer()
+	local pos = player:GetShootPos()
+	local ang = gui.ScreenToVector( gui.MousePos() )
+	local tracedata = {}
+	tracedata.start = pos
+	tracedata.endpos = pos+(ang*1000)
+	tracedata.filter = player
+	local trace = util.TraceLine(tracedata)
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+		local trace = util.GetPlayerTrace( ply, ply:GetCursorAimVector( ) )
+		local tr = util.TraceLine( trace )
+
+	if tr.HitNonWorld then
+		target = tr.Entity --Store the entity it hit
+	end
+	if (target) then
+		local class = item:GetClass();
+		if( string.sub(class, 1, 5) == "item_" ) then 
+			ItemData[item:GetTable().Data.UniqueID].Owner = ply
+			ItemData[item:GetTable().Data.UniqueID].OnPickup( ItemData[item:GetTable().Data.UniqueID], ply )
+			SaveInfo(ply);
+			tr.Entity:Remove();
+		end
+	end

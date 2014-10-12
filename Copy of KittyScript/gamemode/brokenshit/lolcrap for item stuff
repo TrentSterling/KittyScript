@@ -1,0 +1,74 @@
+
+
+
+function meta:GiveItem( id, err, forcegive )
+	
+	if( err == nil ) then err = true; end
+	
+	local size = TS.ItemData[id].Size;
+	local nosize = false;
+	
+	if( TS.ItemData[id].Wearable ) then
+	
+		if( not self:HasItem( id ) ) then
+			nosize = true;
+		end
+	
+	end
+	
+	if( not forcegive and not nosize and not self:HasRoomForItem( id ) ) then
+		if( err ) then
+			self:PrintMessage( 3, TS.ItemData[id].Name .. ": You cannot fit this item in to your inventory" );
+		end
+		return;	
+	end
+	
+	if( nosize ) then size = 0; end
+	
+	local canpickup = true;
+	
+	self:SetNWFloat( "inventory.CrntSize", self:GetNWFloat( "inventory.CrntSize" ) + size );
+	
+	if( TS.ItemData[id].CanPickup ) then
+		canpickup = TS.ItemData[id].CanPickup( TS.ItemData[id], self );
+	end
+	
+	if( canpickup ) then
+	
+		if( not self:GetTable().Inventory[id] ) then
+		
+			self:GetTable().Inventory[id] = { }
+			self:GetTable().Inventory[id].Table = { }
+			
+			for k, v in pairs( TS.ItemData[id] ) do
+				self:GetTable().Inventory[id].Table[k] = v;
+			end
+			
+			self:GetTable().Inventory[id].Table.Owner = self;
+			self:GetTable().Inventory[id].Amt = 1;
+			self:GetTable().Inventory[id].NoSize = nosize;
+		
+		else
+		
+			self:GetTable().Inventory[id].Amt = self:GetTable().Inventory[id].Amt + 1;
+		
+		end
+		
+		if( self:GetTable().Inventory[id].Table.OnPickup ) then
+			self:GetTable().Inventory[id].Table.OnPickup( self:GetTable().Inventory[id].Table );
+		end
+		
+		umsg.Start( "AddInventory", self );
+			umsg.String( id );
+			umsg.String( TS.ItemData[id].Name or "" );
+			umsg.String( TS.ItemData[id].Model or "" );
+			umsg.Bool( TS.ItemData[id].Usable or false );
+			umsg.Float( TS.ItemData[id].Weight );
+			umsg.Float( size );
+			umsg.String( TS.ItemData[id].Desc );
+		umsg.End();
+		
+	end
+
+end
+

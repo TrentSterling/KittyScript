@@ -1,0 +1,130 @@
+
+function TargetThink()
+
+
+	if( tr.Entity:IsValid() ) then
+	
+		local newfade = true;
+	
+		for k, v in pairs( TargetText ) do
+			
+			if( v.ent == tr.Entity ) then
+				
+				if( FadingObj[v.id] ) then
+				
+					FadingObj[v.id].color.a = FadingObj[v.id].fade;
+					newfade = false;
+						
+					if( tr.Entity:IsItem() and FadingObj[v.id].text ) then
+			
+						FadingObj[v.id].text = tr.Entity:GetItemName() .. "\nSize: " .. tr.Entity:GetItemSize() .. "\nTake with [Use Key]";
+					
+					end
+						
+				else
+
+					for n, m in pairs( TargetText ) do
+					
+						if( m.ent == v.ent ) then
+		
+							FadingObj[m.id] = nil;
+							TargetText[n] = nil;
+							
+						end
+					
+					end
+					
+					newfade = true;
+					
+				end
+					
+			end
+			
+		end
+		
+		
+		if( newfade ) then
+	
+			CurTargetEnt = tr.Entity;
+			local pos = tr.Entity:EyePos();
+			pos.z = pos.z + 10;
+			
+			local str = "";
+			local id = 0;
+			local color = Color( 255, 255, 255, 255 );
+			local aimpos = false;
+
+
+	if( tr.Entity:IsValid() ) then
+				if( string.sub(tr.Entity:GetClass(), 1, 5) == "item_") then
+							str = tr.Entity:GetItemName() .. "\nSize: " .. tr.Entity:GetItemSize() .. "\nTake with [Use Key]";
+							LocalPlayer():PrintMessage( HUD_PRINTTALK, str ) --Tell em where they are
+							
+				end
+	end
+	
+	
+			local scrpos = pos:ToScreen();
+			
+			local id = AddFadingText( scrpos.x, scrpos.y, "TargetID", str, 1, color, 1, 500, true );
+			table.insert( TargetText, { id = id, ent = CurTargetEnt, AimPos = pos, aimpos = aimpos } );
+			
+	
+	
+	
+	
+	
+	
+	
+	
+	for k, v in pairs( TargetText ) do
+	
+		local id = v.id;
+		local ent = v.ent;
+		
+		if( FadingObj[id] and ent:IsValid() ) then
+			local pos = ent:EyePos();
+			pos.z = pos.z + 20;
+			
+			if( v.aimpos ) then
+			
+				pos = v.AimPos;
+			
+			end
+			
+			local scrpos = pos:ToScreen();
+			FadingObj[id].x = scrpos.x + ( v.xoffset or 0 );
+			FadingObj[id].y = scrpos.y + ( v.yoffset or 0 );
+		else
+		
+			for n, m in pairs( TargetText ) do
+			
+				if( m.ent == ent ) then
+
+					FadingObj[m.id] = nil;
+					TargetText[n] = nil;
+					
+				end
+			
+			end
+
+		end
+	
+	end
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+    
+end
+hook.Add( "Think", "TargetThink", TargetThink );
+
+
+

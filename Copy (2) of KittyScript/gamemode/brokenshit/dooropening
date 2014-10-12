@@ -1,0 +1,22 @@
+		--// Trace Stuff ////////////////////
+		local player = LocalPlayer()
+		local pos = player:GetShootPos()
+		local ang = gui.ScreenToVector( gui.MousePos() )
+		local tracedata = {}
+		tracedata.start = pos
+		tracedata.endpos = pos+(ang*1000)
+		tracedata.filter = player
+		local trace = util.TraceLine(tracedata)
+
+		if trace.HitNonWorld then
+		target = trace.Entity --Store the entity it hit
+		end
+
+		if (target) then
+			local class = target:GetClass();
+			if( class == "prop_door_rotating" ) then 
+				if( player:GetPos():Distance( target:GetPos() ) < 150 ) then
+					--do something
+					--ply:ConCommand("rp_opendoor") 
+				end
+			end
